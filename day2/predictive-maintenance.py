@@ -1,23 +1,54 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
+import joblib
+import time
+from datetime import datetime
 
-DATA_PATH = "System-Automation-Psg-23i213\day2\data\day2_sample.csv"
+MODEL_PATH = "./sensor_model.pkl"
+LOG_FILE = "./decision_log.txt"
 
-def train_model():
-    df = pd.read_csv(DATA_PATH)
-    x = df[["temperature", "pressure", "vibration", "rpm", "current"]]
-    y = df["state"]
+model = joblib.load(MODEL_PATH)
 
-    x_train, x_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.25, random_state=42
-    )
+def predict_state(reading):
+    features = [
+        "temperature", "pressure", "vibration", "rpm", "current"
+    ]
 
-    model = DecisionTreeClassifier(max_depth=4,random_state=42)
-    model.fit(x_train, y_train)
-    print("Hold-out Accuracy:", model.score(x_test, y_test))
-    
-    return model
+    X = pd.DataFrame([reading], columns=features)
+    return model.predict(X)[0]
+
+
+def take_action(action):
+    actions = {
+        "normal": "All readings are normal. Machine continues running.",
+        "warning": "Abnormal reading detected. Schedule machine inspection.",
+        "critical": "Critical condition detected. Stop machine and alert operator."
+    }
+    return actions.get(action, f"No handler yet for action: {action}")
+
+
+def log_decision(reading, prediction, action):
+    with open(LOG_FILE, "a") as file:
+        file.write(
+            f"{datetime.now().isoformat(timespec='seconds')} | "
+            f"Reading: {reading} | "
+            f"Prediction: {prediction} | "
+            f"Action: {action}\n"
+        )
+
+
+def main():
+    for tick in range(1, 11):
+        reading = generate_sensor_data()
+
+        prediction = predict_state(reading)
+        outcome = take_action(prediction)
+
+        print(f"[Tick {tick:02d}] SENSE -> {reading}")
+        print(f"           PREDICT -> {prediction}")
+        print(f"           ACT     -> {outcome}\n")
+
+        log_decision(reading, prediction, outcome)
+        time.sleep(0.2)
+
 
 if __name__ == "__main__":
-    model = train_model()
+    main()
